@@ -31,8 +31,10 @@ end
 
 module Longident = struct
   include Longident
-  type q = [%import: Longident.t] [@@deriving crowbar]
-  let to_crowbar = q_to_crowbar
+      (* if we make Lapply's, we can easily trigger a Misc.fatal_error from Longident.last, so don't do that *)
+  let to_crowbar = Crowbar.(map [choose [const "foo"; const "bar";
+                                        const "baz"; const "quux";
+                                         const "porg"; const "morp";]] (fun l -> Lident l));
 end
 
 open Asttypes
@@ -56,8 +58,6 @@ module Parsetree = struct
     Crowbar.(list @@ map [ptype_param_core_type_descs; variance_to_crowbar]
                (fun ct v -> (Ast_helper.Typ.mk ct), v))
 end
-
-(* first assert failure is getting a type description that isn't Ptyp_any or Ptyp_var in `transl_type_param`. *)
 
 type attribute = [%import: Parsetree.attribute]
 and extension = [%import: Parsetree.extension]

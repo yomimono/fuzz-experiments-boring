@@ -26,7 +26,9 @@ let () =
       let t_str = 
         { pstr_loc = Location.none; pstr_desc = Pstr_type (Asttypes.Recursive, [t])}
       in
-      try (ignore @@ Typemod.type_implementation "string1" "/tmp/lollerskates" "string2" Env.empty [ t_str; exp_str; ])
+      let program = [t_str; exp_str] in
+      Format.printf "%a@." Pprintast.structure program;
+      try (ignore @@ Typemod.type_implementation "string1" "/tmp/lollerskates" "string2" Env.empty program)
             with
             | Typemod.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typemod.report_error env) e
             | Typetexp.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typetexp.report_error env) e
