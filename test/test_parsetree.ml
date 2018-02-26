@@ -27,11 +27,18 @@ let () =
         { pstr_loc = Location.none; pstr_desc = Pstr_type (Asttypes.Recursive, [t])}
       in
       let program = [t_str; exp_str] in
+      (* if we print it, can we read it back? *)
+      let program_str = Format.asprintf "%a@." Pprintast.structure program in
       Format.printf "%a@." Pprintast.structure program;
-      try (ignore @@ Typemod.type_implementation "string1" "/tmp/lollerskates" "string2" Env.empty program)
-            with
-            | Typemod.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typemod.report_error env) e
-            | Typetexp.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typetexp.report_error env) e
-            | Typecore.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typecore.report_error env) e
-            | Typedecl.Error (_, e) -> Format.eprintf "%a\n%!" Typedecl.report_error e
+      let lexbuf = Lexing.from_string program_str in
+      Env.set_unit_name "Radmod"; (* how side-effecting is this? *)
+      try ((ignore @@ Typemod.type_implementation "string1" "/tmp/lollerskates" "string2"
+              (Compmisc.initial_env ()) (Parse.implementation lexbuf)); Crowbar.fail "I somehow made a well-typed program, plz alert media")
+      with
+      | Typemod.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typemod.report_error env) e
+      | Typetexp.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typetexp.report_error env) e
+      | Typecore.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typecore.report_error env) e
+      | Typedecl.Error (_, e) -> Format.eprintf "%a\n%!" Typedecl.report_error e
+      | Syntaxerr.Error _ -> Printf.eprintf "Syntax error\n%!"
+      | Lexer.Error _ -> Printf.eprintf "Lexing error\n%!"
     ));

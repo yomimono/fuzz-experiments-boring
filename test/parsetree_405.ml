@@ -1,3 +1,16 @@
+module Crowbar = struct
+  include Crowbar
+  let string = (choose
+                  [ const "true"; const "false";
+                    const "0"; const "1";
+                    const ".23"; const "A";
+                    const "foo"; const "bar";
+                    const "baz"; const "quux";
+                    const "porg"; const "morp";])
+  let bytes = string
+end
+
+
 module Location = struct
   include Location
   let to_crowbar = Crowbar.const Location.none
@@ -32,19 +45,12 @@ end
 module Longident = struct
   include Longident
       (* if we make Lapply's, we can easily trigger a Misc.fatal_error from Longident.last, so don't do that *)
-  let to_crowbar = Crowbar.(map [choose [const "foo"; const "bar";
-                                        const "baz"; const "quux";
-                                         const "porg"; const "morp";]] (fun l -> Lident l));
+  let to_crowbar = Crowbar.(map [bytes] (fun l -> Lident l));
 end
 
 open Asttypes
 
 type constant = [%import: Ast_405.Parsetree.constant] [@@deriving crowbar]
-
-let identifier_to_crowbar = Crowbar.(choose
-                                       [const "foo"; const "bar";
-                                        const "baz"; const "quux";
-                                        const "porg"; const "morp";])
 
 module Parsetree = struct
   include Ast_405.Parsetree
@@ -53,7 +59,7 @@ module Parsetree = struct
   let ptype_params_to_crowbar =
     let ptype_param_core_type_descs = Crowbar.(choose [
       const Ptyp_any;
-      map [identifier_to_crowbar] (fun i -> Ptyp_var i);
+      map [string] (fun i -> Ptyp_var i);
     ]) in
     Crowbar.(list @@ map [ptype_param_core_type_descs; variance_to_crowbar]
                (fun ct v -> (Ast_helper.Typ.mk ct), v))
@@ -66,9 +72,9 @@ and payload = [%import: Parsetree.payload]
 and core_type = [%import: Parsetree.core_type]
 and core_type_desc = [%import: Parsetree.core_type_desc] [@@generator
   Crowbar.(let ct = unlazy core_type_to_crowbar in
-           let obj_prim = map [identifier_to_crowbar; ct] (fun s c -> (Location.mknoloc s, [], c)) in
+           let obj_prim = map [string; ct] (fun s c -> (Location.mknoloc s, [], c)) in
            choose [const Parsetree.Ptyp_any;
-                   map [identifier_to_crowbar] (fun i -> Ptyp_var i);
+                   map [string] (fun i -> Ptyp_var i);
                    map [arg_label_to_crowbar; ct; ct] (fun a b c -> Ptyp_arrow (a, b, c));
                    (* failing to give the minimum number of elements to
                       Ptyp_tuple results in many assertion failures.
@@ -79,7 +85,7 @@ and core_type_desc = [%import: Parsetree.core_type_desc] [@@generator
                    map [list obj_prim; closed_flag_to_crowbar] (fun l f -> Ptyp_object (l, f));
                    map [Longident.to_crowbar; list ct] (fun i l ->
                        Ptyp_class (Location.mknoloc i, l));
-                   map [ct; identifier_to_crowbar] (fun c i -> Ptyp_alias (c, i));
+                   map [ct; string] (fun c i -> Ptyp_alias (c, i));
                    map [list (unlazy row_field_to_crowbar);
                         closed_flag_to_crowbar;
                         option (list label_to_crowbar)]
@@ -115,7 +121,7 @@ and expression_desc = [%import: Parsetree.expression_desc] [@@generator Crowbar.
              really map an arbitrary arg_label to none, or
              Optional label, Some expression *)
           map [arg_label_to_crowbar] (fun l -> (l, None));
-          map [identifier_to_crowbar; exp] (fun i e -> (Optional i, Some e))
+          map [string; exp] (fun i e -> (Optional i, Some e))
         ];
         unlazy pattern_to_crowbar; exp]
         (fun (a, b) c d -> Pexp_fun (a, b, c, d));
@@ -145,9 +151,9 @@ and expression_desc = [%import: Parsetree.expression_desc] [@@generator Crowbar.
       map [exp; unlazy core_type_to_crowbar] (fun e c -> Pexp_constraint (e, c));
       map [exp; option (unlazy core_type_to_crowbar); unlazy core_type_to_crowbar]
         (fun e oc c -> Pexp_coerce (e, oc, c));
-      map [exp; identifier_to_crowbar] (fun e s -> Pexp_send (e, Location.mknoloc s));
+      map [exp; string] (fun e s -> Pexp_send (e, Location.mknoloc s));
       map [lid_loc] (fun l -> Pexp_new l);
-      map [identifier_to_crowbar; exp] (fun i e -> Pexp_setinstvar ((Location.mknoloc i), e));
+      map [string; exp] (fun i e -> Pexp_setinstvar ((Location.mknoloc i), e));
       (* tfw you get halfway through and realize you need automation for your automation *)
 
     ]
@@ -156,7 +162,7 @@ and case = [%import: Parsetree.case]
 and value_description = [%import: Parsetree.value_description]
 and type_declaration = [%import: Parsetree.type_declaration] [@@generator
   Crowbar.(let ct = unlazy core_type_to_crowbar in
-           map [identifier_to_crowbar;
+           map [string;
                 Parsetree.ptype_params_to_crowbar;
                 list (map [ct; ct; Location.to_crowbar] (fun t1 t2 l -> (t1, t2, l)));
                 unlazy type_kind_to_crowbar;
