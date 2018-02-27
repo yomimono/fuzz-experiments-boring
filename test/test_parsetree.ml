@@ -9,12 +9,12 @@
 
 let () =
   (* get an arbitrary type, but always call it `t` *)
-  let type_named ~name : Parsetree.type_declaration Crowbar.gen = Crowbar.(map [Parsetree_405.type_declaration_to_crowbar] (fun d ->
+  let type_named ~name : Parsetree.type_declaration Crowbar.gen = Crowbar.(map [Parsetree_406.type_declaration_to_crowbar] (fun d ->
       Parsetree.{d with ptype_name = (Location.mknoloc name)}))
   in
   let constrained_by ~name : Parsetree.core_type =
     Ast_helper.Typ.mk @@ Parsetree.Ptyp_constr ((Location.mknoloc (Longident.parse name)),[]) in
-  Crowbar.(add_test ~name:"make a program" [type_named ~name:"t"; list Parsetree_405.case_to_crowbar] (fun t cases ->
+  Crowbar.(add_test ~name:"make a program" [type_named ~name:"t"; list Parsetree_406.case_to_crowbar] (fun t cases ->
       let open Parsetree in
       let name = "f" in
       let function_exp =
