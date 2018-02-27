@@ -154,8 +154,18 @@ and expression_desc = [%import: Parsetree.expression_desc] [@@generator Crowbar.
       map [exp; string] (fun e s -> Pexp_send (e, Location.mknoloc s));
       map [lid_loc] (fun l -> Pexp_new l);
       map [string; exp] (fun i e -> Pexp_setinstvar ((Location.mknoloc i), e));
-      (* tfw you get halfway through and realize you need automation for your automation *)
-
+      map [list (map [string; exp] (fun i e -> (Location.mknoloc i, e)))] (fun l -> Pexp_override l);
+      (* map [string; (unlazy module_expr_to_crowbar); exp] (fun s m e -> Pexp_letmodule (Location.mknoloc s, m, e)); *) (* don't mess around in the module language *)
+      map [unlazy extension_constructor_to_crowbar; exp] (fun c e -> Pexp_letexception (c, e));
+      map [exp] (fun e -> Pexp_assert e);
+      map [exp] (fun e -> Pexp_lazy e);
+      (* map [exp, option (unlazy core_type_to_crowbar)] (fun e c -> Pexp_poly (e, c)); *) (* parsetree.mli: Pexp_poly can only be used as the expression under Cfk_concrete for methods, so don't generate it everywhere *)
+      map [unlazy class_structure_to_crowbar] (fun c -> Pexp_object c);
+      map [string; exp] (fun s e -> Pexp_newtype (Location.mknoloc s, e));
+      (* map [unlazy module_expr_to_crowbar] (fun m -> Pexp_pack m); *) (* don't get lost in module language *)
+      (* Pexp_open would go here *)
+      (* skip Pexp_extension *)
+      (* and Pexp_unreachable :) *)
     ]
   )]
 and case = [%import: Parsetree.case]

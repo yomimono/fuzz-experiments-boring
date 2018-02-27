@@ -12,15 +12,18 @@ let () =
   let type_named ~name : Parsetree.type_declaration Crowbar.gen = Crowbar.(map [Parsetree_405.type_declaration_to_crowbar] (fun d ->
       Parsetree.{d with ptype_name = (Location.mknoloc name)}))
   in
-  let _constrained_by ~name : Parsetree.core_type =
+  let constrained_by ~name : Parsetree.core_type =
     Ast_helper.Typ.mk @@ Parsetree.Ptyp_constr ((Location.mknoloc (Longident.parse name)),[]) in
   Crowbar.(add_test ~name:"make a program" [type_named ~name:"t"; list Parsetree_405.case_to_crowbar] (fun t cases ->
       let open Parsetree in
       let name = "f" in
-      let exp =
+      let function_exp =
         { pexp_loc = Location.none; pexp_attributes = [];
           pexp_desc = Pexp_function cases} in
-      let exp_vb = Ast_helper.Vb.mk (Ast_helper.Pat.mk (Ppat_var (Location.mknoloc name))) exp in
+      let constrained_exp =
+        { pexp_loc = Location.none; pexp_attributes = [];
+          pexp_desc = Pexp_constraint (function_exp, constrained_by ~name:"t")} in
+      let exp_vb = Ast_helper.Vb.mk (Ast_helper.Pat.mk (Ppat_var (Location.mknoloc name))) constrained_exp in
       let exp_str =
         { pstr_loc = Location.none; pstr_desc = Pstr_value (Asttypes.Nonrecursive, [exp_vb])} in
       let t_str = 
