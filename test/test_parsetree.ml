@@ -26,14 +26,12 @@ let () =
       let exp_vb = Ast_helper.Vb.mk (Ast_helper.Pat.mk (Ppat_var (Location.mknoloc name))) constrained_exp in
       let exp_str =
         { pstr_loc = Location.none; pstr_desc = Pstr_value (Asttypes.Nonrecursive, [exp_vb])} in
-      let t_str = 
-        { pstr_loc = Location.none; pstr_desc = Pstr_type (Asttypes.Recursive, [t])}
-      in
-      let program = [t_str; exp_str] in
-      (* if we print it, can we read it back? *)
-      let program_str = Format.asprintf "%a@." Pprintast.structure program in
+      let program = [
+        { pstr_loc = Location.none; pstr_desc = Pstr_type (Asttypes.Recursive, [t])};
+                     exp_str] in
       Format.printf "%a@." Pprintast.structure program;
-      let lexbuf = Lexing.from_string program_str in
+      (* if we print it, can we read it back? *)
+      let lexbuf = Lexing.from_string @@ Format.asprintf "%a@." Pprintast.structure program in
       Env.set_unit_name "Radmod"; (* how side-effecting is this? *)
       try ((ignore @@ Typemod.type_implementation "string1" "/tmp/lollerskates" "string2"
               (Compmisc.initial_env ()) (Parse.implementation lexbuf)); Crowbar.fail "I somehow made a well-typed program, plz alert media")

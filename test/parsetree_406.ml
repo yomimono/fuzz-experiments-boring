@@ -3,7 +3,8 @@ module Crowbar = struct
   let string = (choose
                   [ const "true"; const "false";
                     const "0"; const "1";
-                    const ".23"; const "A";
+                    const "3l"; const "10";
+                    const "0.23"; const "A";
                     const "foo"; const "bar";
                     const "baz"; const "quux";
                     const "porg"; const "morp";])
@@ -50,7 +51,15 @@ end
 
 open Asttypes
 
-type constant = [%import: Ast_406.Parsetree.constant] [@@deriving crowbar]
+type constant = [%import: Parsetree.constant]
+(* constant has a number of constraints expressed in parsetree.mli *)
+let constant_to_crowbar = Crowbar.(choose [
+    map [int; option (choose [const 'n'; const 'l'; const 'L'])] (fun s n -> Parsetree.Pconst_integer (string_of_int s, n));
+    map [uint8] (fun c -> Parsetree.Pconst_char (Char.chr c));
+    map [bytes; option bytes] (fun s delim -> Parsetree.Pconst_string (s, delim));
+    map [float; (* it seems no char will be accepted by the typechecker as the second argument of Pconst_float, so never make any *)
+         const None] (fun f n -> Parsetree.Pconst_float (string_of_float f, n))
+  ])
 
 module Parsetree = struct
   include Ast_406.Parsetree
@@ -160,7 +169,7 @@ and expression_desc = [%import: Parsetree.expression_desc] [@@generator Crowbar.
       map [unlazy extension_constructor_to_crowbar; exp] (fun c e -> Pexp_letexception (c, e));
       map [exp] (fun e -> Pexp_assert e);
       map [exp] (fun e -> Pexp_lazy e);
-      (* map [exp, option (unlazy core_type_to_crowbar)] (fun e c -> Pexp_poly (e, c)); *) (* parsetree.mli: Pexp_poly can only be used as the expression under Cfk_concrete for methods, so don't generate it everywhere *)
+      map [exp; option (unlazy core_type_to_crowbar)] (fun e c -> Pexp_poly (e, c)); (* parsetree.mli: Pexp_poly can only be used as the expression under Cfk_concrete for methods, so we'd expect this to cause some trouble *)
       map [unlazy class_structure_to_crowbar] (fun c -> Pexp_object c);
       map [string; exp] (fun s e -> Pexp_newtype (Location.mknoloc s, e));
       (* map [unlazy module_expr_to_crowbar] (fun m -> Pexp_pack m); *) (* don't get lost in module language *)
@@ -226,7 +235,24 @@ and module_type = [%import: Parsetree.module_type]
 and module_type_desc = [%import: Parsetree.module_type_desc]
 and signature = [%import: Parsetree.signature]
 and signature_item = [%import: Parsetree.signature_item]
-and signature_item_desc = [%import: Parsetree.signature_item_desc]
+and signature_item_desc = [%import: Parsetree.signature_item_desc] [@@generator
+   (* custom generator needed because parsing/pprintast.ml has an assert false triggered for Psig_type (_, []) *)
+  Crowbar.(choose [
+      map [unlazy value_description_to_crowbar] (fun d -> Psig_value d);
+      map [rec_flag_to_crowbar; list1 @@ unlazy type_declaration_to_crowbar] (fun r l -> Psig_type (r, l));
+      map [unlazy type_extension_to_crowbar] (fun e -> Psig_typext e);
+      map [unlazy extension_constructor_to_crowbar] (fun e -> Psig_exception e);
+      (* skip Psig_module *)
+      (* skip Psig_recmodule *)
+      (* skip Psig_modtype *)
+      map [unlazy open_description_to_crowbar] (fun d -> Psig_open d);
+      map [unlazy include_description_to_crowbar] (fun d -> Psig_include d);
+      (* might want to cut the class stuff too *)
+      map [list @@ unlazy class_description_to_crowbar] (fun l -> Psig_class l);
+      map [list @@ unlazy class_type_declaration_to_crowbar] (fun l -> Psig_class_type l);
+      (* no attributes *)
+      (* no extensions *)
+    ])]
 and module_declaration = [%import: Parsetree.module_declaration]
 and module_type_declaration = [%import: Parsetree.module_type_declaration]
 and open_description = [%import: Parsetree.open_description]
@@ -238,7 +264,29 @@ and module_expr = [%import: Parsetree.module_expr]
 and module_expr_desc = [%import: Parsetree.module_expr_desc]
 and structure = [%import: Parsetree.structure]
 and structure_item = [%import: Parsetree.structure_item]
-and structure_item_desc = [%import: Parsetree.structure_item_desc]
+and structure_item_desc = [%import: Parsetree.structure_item_desc] [@@generator
+   (* custom generator needed because parsing/pprintast.ml:1216 has an assert false for Pstr_type (_, []) *)
+  Crowbar.(choose [
+      map [unlazy expression_to_crowbar; const []] (fun e a -> Pstr_eval (e, a));
+      map [rec_flag_to_crowbar; list (unlazy value_binding_to_crowbar)] (fun f l -> Pstr_value (f, l));
+      map [unlazy value_description_to_crowbar] (fun d -> Pstr_primitive d);
+      map [rec_flag_to_crowbar; list1 (unlazy type_declaration_to_crowbar)] (fun f l -> Pstr_type (f, l));
+      map [unlazy type_extension_to_crowbar] (fun e -> Pstr_typext e);
+      map [unlazy extension_constructor_to_crowbar] (fun e -> Pstr_exception e);
+      (* might want to cut the module stuff *)
+      (* indeed, do cut them, because we trigger parsing/pprint.ast.ml:1325 with them *) (*
+      map [unlazy module_binding_to_crowbar] (fun b -> Pstr_module b);
+      map [list @@ unlazy module_binding_to_crowbar] (fun b -> Pstr_recmodule b); (* this list probably needs to be nonempty, but that's not documented so let's see how it does *)
+      map [unlazy module_type_declaration_to_crowbar] (fun d -> Pstr_modtype d); *)
+      map [unlazy open_description_to_crowbar] (fun d -> Pstr_open d);
+      (* might want to cut the class stuff too *)
+      map [list @@ unlazy class_declaration_to_crowbar] (fun l -> Pstr_class l);
+      map [list @@ unlazy class_type_declaration_to_crowbar] (fun l -> Pstr_class_type l);
+      map [unlazy include_declaration_to_crowbar] (fun d -> Pstr_include d);
+      (* don't bother with attributes *)
+      (* also don't bother with extensions *)
+    ]
+   )]
 and value_binding = [%import: Parsetree.value_binding]
 and module_binding = [%import: Parsetree.module_binding]
 [@@deriving crowbar]
