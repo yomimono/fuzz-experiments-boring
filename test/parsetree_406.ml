@@ -1,10 +1,8 @@
 module Crowbar = struct
   include Crowbar
   let string = (choose
-                  [ const "true"; const "false";
-                    const "0"; const "1";
-                    const "3l"; const "10";
-                    const "0.23"; const "A";
+                  [ const "a"; const "b";
+                    const "B"; const "A";
                     const "foo"; const "bar";
                     const "baz"; const "quux";
                     const "porg"; const "morp";])

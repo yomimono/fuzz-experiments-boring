@@ -29,17 +29,20 @@ let () =
       let program = [
         { pstr_loc = Location.none; pstr_desc = Pstr_type (Asttypes.Recursive, [t])};
                      exp_str] in
-      Format.printf "%a@." Pprintast.structure program;
-      (* if we print it, can we read it back? *)
+      let env = (* Compmisc.initial_env () *) Env.empty in
       let lexbuf = Lexing.from_string @@ Format.asprintf "%a@." Pprintast.structure program in
-      Env.set_unit_name "Radmod"; (* how side-effecting is this? *)
-      try ((ignore @@ Typemod.type_implementation "string1" "/tmp/lollerskates" "string2"
-              (Compmisc.initial_env ()) (Parse.implementation lexbuf)); Crowbar.fail "I somehow made a well-typed program, plz alert media")
-      with
-      | Typemod.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typemod.report_error env) e
-      | Typetexp.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typetexp.report_error env) e
-      | Typecore.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typecore.report_error env) e
-      | Typedecl.Error (_, e) -> Format.eprintf "%a\n%!" Typedecl.report_error e
-      | Syntaxerr.Error _ -> Printf.eprintf "Syntax error\n%!"
-      | Lexer.Error _ -> Printf.eprintf "Lexing error\n%!"
+      Format.eprintf "%a\n%!" Pprintast.structure program;
+      match Typemod.type_implementation "string1" "/tmp/lollerskates" "string2"
+              env (Parse.implementation lexbuf)
+      with 
+      | _str, _mod -> Format.eprintf "%a\n%!" Pprintast.structure program
+      | exception Typemod.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typemod.report_error env) e
+      | exception Typetexp.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typetexp.report_error env) e
+      | exception Typecore.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typecore.report_error env) e
+      | exception Typedecl.Error (_, e) -> Format.eprintf "%a\n%!" Typedecl.report_error e
+      | exception Typeclass.Error (_, env, e) -> Format.eprintf "%a\n%!" (Typeclass.report_error env) e
+      | exception Typeclass.Error_forward loc -> Format.eprintf "error_forward: %a\n%!" Location.report_error loc
+      | exception Syntaxerr.Error e -> Format.eprintf "Syntax error\n%!" (* location info is useless, and that's all we get *)
+      | exception Lexer.Error (e, _) -> Format.eprintf "Lexing error: %a\n%!" Lexer.report_error e
+
     ));
